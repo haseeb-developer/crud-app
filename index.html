@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ultra Advanced CRUD with Persistence, Animations & More</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Animate.css for extra animation effects -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <!-- SortableJS (for drag and drop reordering) -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <style>
+    /* Smooth transition for dark mode and background changes */
+    body {
+      transition: background-color 0.3s, color 0.3s;
+    }
+    /* Custom animations for table rows */
+    .table-row-enter {
+      animation: slideIn 0.5s ease forwards;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .fade-out {
+      animation: fadeOut 0.5s ease forwards;
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    /* Completed tasks style */
+    .completed {
+      text-decoration: line-through;
+      color: #6c757d;
+    }
+    /* Dark mode styles */
+    .dark-mode {
+      background-color: #121212;
+      color: #e0e0e0;
+    }
+    .dark-mode .card {
+      background-color: #1e1e1e;
+    }
+    .dark-mode .table {
+      color: #e0e0e0;
+    }
+    /* Hover effect on table rows */
+    tr:hover {
+      transform: scale(1.01);
+      transition: transform 0.2s;
+    }
+    /* Toast container position */
+    #toastContainer {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1050;
+    }
+  </style>
+</head>
+<body>
+<div class="container my-5">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+    <h2>Ultra Advanced CRUD Application</h2>
+    <div class="d-flex align-items-center">
+      <button id="toggleDarkMode" class="btn btn-secondary me-2">Toggle Dark Mode</button>
+      <!-- Sort control for items by name -->
+      <select id="sortOrder" class="form-select w-auto me-2">
+        <option value="default">Sort: Default</option>
+        <option value="asc">Sort: Name Asc</option>
+        <option value="desc">Sort: Name Desc</option>
+      </select>
+    </div>
+  </div>
+  
+  <!-- Form to add a new item -->
+  <div class="card mb-4 shadow-sm animate__animated animate__fadeIn">
+    <div class="card-body">
+      <form id="crud-form">
+        <div class="mb-3">
+          <label for="itemName" class="form-label">
+            Item Name 
+            <span data-bs-toggle="tooltip" title="Enter a descriptive name for your item">?</span>
+          </label>
+          <input type="text" class="form-control" id="itemName" placeholder="Enter item name" required>
+        </div>
+        <div class="mb-3">
+          <label for="itemDesc" class="form-label">
+            Description 
+            <span data-bs-toggle="tooltip" title="Provide additional details about the item">?</span>
+          </label>
+          <textarea class="form-control" id="itemDesc" rows="2" placeholder="Enter description"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Item</button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Search, Filter and Stats -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center">
+      <input type="text" id="searchInput" class="form-control me-2" placeholder="Search items...">
+      <select id="statusFilter" class="form-select me-2">
+        <option value="all">All</option>
+        <option value="completed">Completed</option>
+        <option value="pending">Pending</option>
+      </select>
+    </div>
+    <div>
+      <span id="totalCount" class="badge bg-info">Total: 0</span>
+      <span id="completedCount" class="badge bg-success">Completed: 0</span>
+    </div>
+  </div>
+  
+  <!-- Table to display items -->
+  <div class="card shadow-sm animate__animated animate__fadeInUp">
+    <div class="card-body">
+      <table class="table table-striped" id="items-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Item Name</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Items will be dynamically inserted here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal for updating items -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content animate__animated">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editModalLabel">Edit Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-form">
+          <div class="mb-3">
+            <label for="editItemName" class="form-label">Item Name</label>
+            <input type="text" class="form-control" id="editItemName" required>
+          </div>
+          <div class="mb-3">
+            <label for="editItemDesc" class="form-label">Description</label>
+            <textarea class="form-control" id="editItemDesc" rows="2"></textarea>
+          </div>
+          <input type="hidden" id="editItemId">
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="saveEditBtn" class="btn btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notifications Container -->
+<div id="toastContainer"></div>
+
+<!-- Bootstrap JS Bundle (includes Popper) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Initialize Bootstrap tooltips
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+
+  let items = [];
+  let currentId = 1;
+  
+  // Load saved items from localStorage if available
+  if(localStorage.getItem('crudItems')) {
+    items = JSON.parse(localStorage.getItem('crudItems'));
+    if(items.length > 0) {
+      currentId = Math.max(...items.map(item => item.id)) + 1;
+    }
+  }
+  
+  const crudForm = document.getElementById('crud-form');
+  const itemNameInput = document.getElementById('itemName');
+  const itemDescInput = document.getElementById('itemDesc');
+  const itemsTableBody = document.querySelector('#items-table tbody');
+  
+  const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+  const editItemNameInput = document.getElementById('editItemName');
+  const editItemDescInput = document.getElementById('editItemDesc');
+  const editItemIdInput = document.getElementById('editItemId');
+  const saveEditBtn = document.getElementById('saveEditBtn');
+  
+  const searchInput = document.getElementById('searchInput');
+  const statusFilter = document.getElementById('statusFilter');
+  const sortOrderSelect = document.getElementById('sortOrder');
+  const totalCountSpan = document.getElementById('totalCount');
+  const completedCountSpan = document.getElementById('completedCount');
+  const toggleDarkModeBtn = document.getElementById('toggleDarkMode');
+  
+  // Toast Notification Function
+  function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toastContainer');
+    const toastId = 'toast' + Date.now();
+    const toastHTML = `
+      <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body">
+            ${message}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      </div>`;
+    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+    const toastEl = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+    // Remove toast element after hidden
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+  }
+  
+  // Update localStorage whenever changes occur
+  function updateLocalStorage() {
+    localStorage.setItem('crudItems', JSON.stringify(items));
+  }
+  
+  // Update the statistics badges
+  function updateStats() {
+    totalCountSpan.textContent = 'Total: ' + items.length;
+    const completedCount = items.filter(item => item.completed).length;
+    completedCountSpan.textContent = 'Completed: ' + completedCount;
+  }
+  
+  // Render items in the table with filtering and sorting
+  function renderItems(filterText = '', filterStatus = 'all', sortOrder = 'default') {
+    // Sorting based on sortOrder select value
+    let sortedItems = [...items];
+    if(sortOrder === 'asc') {
+      sortedItems.sort((a, b) => a.name.localeCompare(b.name));
+    } else if(sortOrder === 'desc') {
+      sortedItems.sort((a, b) => b.name.localeCompare(a.name));
+    }
+    
+    itemsTableBody.innerHTML = '';
+    sortedItems
+      .filter(item => {
+        const searchMatches = item.name.toLowerCase().includes(filterText.toLowerCase()) ||
+                              item.desc.toLowerCase().includes(filterText.toLowerCase());
+        let statusMatches = true;
+        if(filterStatus === 'completed') {
+          statusMatches = item.completed === true;
+        } else if(filterStatus === 'pending') {
+          statusMatches = item.completed === false;
+        }
+        return searchMatches && statusMatches;
+      })
+      .forEach(item => {
+        const tr = document.createElement('tr');
+        tr.classList.add('table-row-enter');
+        tr.setAttribute('data-id', item.id);
+        tr.innerHTML = `
+          <td>${item.id}</td>
+          <td class="${item.completed ? 'completed' : ''}">${item.name}</td>
+          <td class="${item.completed ? 'completed' : ''}">${item.desc}</td>
+          <td>
+            ${item.completed ? '<span class="badge bg-success">Completed</span>' : '<span class="badge bg-warning">Pending</span>'}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-info me-2 edit-btn">Edit</button>
+            <button class="btn btn-sm btn-danger me-2 delete-btn">Delete</button>
+            <button class="btn btn-sm btn-secondary complete-btn">${item.completed ? 'Undo' : 'Complete'}</button>
+          </td>
+        `;
+        itemsTableBody.appendChild(tr);
+      });
+    updateStats();
+  }
+  
+  // Initial render from localStorage data
+  renderItems();
+  
+  // Create Operation: Add new item
+  crudForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const name = itemNameInput.value.trim();
+    const desc = itemDescInput.value.trim();
+    if(name !== '') {
+      const newItem = { id: currentId++, name, desc, completed: false };
+      items.push(newItem);
+      updateLocalStorage();
+      renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+      crudForm.reset();
+      showToast('Item added!', 'success');
+    }
+  });
+  
+  // Delegate event listeners for Edit, Delete, and Complete buttons
+  itemsTableBody.addEventListener('click', function(e) {
+    const target = e.target;
+    const tr = target.closest('tr');
+    const id = parseInt(tr.getAttribute('data-id'));
+    
+    if(target.classList.contains('edit-btn')) {
+      const item = items.find(item => item.id === id);
+      if(item) {
+        editItemNameInput.value = item.name;
+        editItemDescInput.value = item.desc;
+        editItemIdInput.value = item.id;
+        editModal.show();
+      }
+    } else if(target.classList.contains('delete-btn')) {
+      tr.classList.add('fade-out');
+      setTimeout(() => {
+        items = items.filter(item => item.id !== id);
+        updateLocalStorage();
+        renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+        showToast('Item deleted!', 'danger');
+      }, 500);
+    } else if(target.classList.contains('complete-btn')) {
+      const item = items.find(item => item.id === id);
+      if(item) {
+        item.completed = !item.completed;
+        updateLocalStorage();
+        renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+        showToast(item.completed ? 'Marked as complete!' : 'Marked as pending!', 'info');
+      }
+    }
+  });
+  
+  // Update Operation: Save changes from edit modal
+  saveEditBtn.addEventListener('click', function() {
+    const id = parseInt(editItemIdInput.value);
+    const newName = editItemNameInput.value.trim();
+    const newDesc = editItemDescInput.value.trim();
+    if(newName !== '') {
+      const item = items.find(item => item.id === id);
+      if(item) {
+        item.name = newName;
+        item.desc = newDesc;
+        updateLocalStorage();
+        renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+        editModal.hide();
+        showToast('Item updated!', 'warning');
+      }
+    }
+  });
+  
+  // Live Search Functionality
+  searchInput.addEventListener('input', function() {
+    renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+  });
+  
+  // Filter items by status when dropdown value changes
+  statusFilter.addEventListener('change', function() {
+    renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+  });
+  
+  // Sort items when sort order changes
+  sortOrderSelect.addEventListener('change', function() {
+    renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+  });
+  
+  // Dark Mode Toggle
+  toggleDarkModeBtn.addEventListener('click', function() {
+    document.body.classList.toggle('dark-mode');
+  });
+  
+  // Enable drag-and-drop reordering using SortableJS
+  Sortable.create(itemsTableBody, {
+    animation: 150,
+    onEnd: function(evt) {
+      // Rebuild items array based on new DOM order
+      let newOrder = [];
+      itemsTableBody.querySelectorAll('tr').forEach(row => {
+        const id = parseInt(row.getAttribute('data-id'));
+        const item = items.find(item => item.id === id);
+        if(item) newOrder.push(item);
+      });
+      items = newOrder;
+      updateLocalStorage();
+      renderItems(searchInput.value, statusFilter.value, sortOrderSelect.value);
+      showToast('Items reordered!', 'secondary');
+    }
+  });
+</script>
+</body>
+</html>
