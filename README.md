@@ -1,1 +1,1 @@
-[Preview](https://github.com)
+[Preview](https://advanced-crud.netlify.app/)
